@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -7,6 +7,8 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    // Vercel's Prisma Postgres integration prefixes its variables with the
+    // project name. Not using env() here so `prisma generate` works without a URL.
+    url: process.env.DATABASE_URL ?? process.env.toodooloo_DATABASE_URL,
   },
 });

@@ -24,6 +24,13 @@ const FIFTEEN_MINUTES = 15 * 60 * 1000;
 const DUMMY_HASH = "$2b$12$g6Wn/ahyKSnseziODfGG4.tCUj0Pc1PCxqmuzybyR5rxTLoqtypH6";
 const TOO_MANY = "Too many attempts. Try again in a few minutes.";
 
+function appUrl(): string {
+  if (process.env.APP_URL) return process.env.APP_URL;
+  // Set automatically on Vercel
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  return "http://localhost:3000";
+}
+
 async function clientIp(): Promise<string> {
   const h = await headers();
   return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
@@ -82,8 +89,7 @@ export async function requestPasswordReset(_prev: FormState, formData: FormData)
         expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
       },
     });
-    const appUrl = process.env.APP_URL ?? "http://localhost:3000";
-    await sendPasswordResetEmail(user.email, `${appUrl}/reset-password?token=${token}`);
+    await sendPasswordResetEmail(user.email, `${appUrl()}/reset-password?token=${token}`);
   }
 
   // Same reply whether or not the account exists, so this form can't be used to find users
