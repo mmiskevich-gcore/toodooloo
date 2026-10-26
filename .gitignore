@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
+
+# local dev mail outbox and test output
+.dev-emails.jsonl
+/test-results/
+/playwright-report/
+!.env.example
