@@ -1,25 +1,48 @@
 "use client";
 
-import { useOptimistic, useState, useTransition, type FormEvent } from "react";
-import { createTodo, deleteTodo, setTodoDone, updateTodoTitle } from "@/app/actions/todos";
+import { useEffect, useOptimistic, useRef, useState, useTransition, type FormEvent } from "react";
+import { createTodo, deleteTodo, setTodoDone, updateTodo } from "@/app/actions/todos";
+import { todayWeekday, WEEKDAYS } from "@/lib/weekdays";
 import { buttonClass, FormMessage, inputClass } from "./ui";
 
-export type TodoView = { id: string; title: string; done: boolean };
+export type TodoView = { id: string; title: string; done: boolean; weekday: number };
+
+const selectClass = `${inputClass} w-auto`;
+
+function DaySelect(props: React.ComponentProps<"select">) {
+  return (
+    <select {...props} className={selectClass}>
+      {WEEKDAYS.map((day, i) => (
+        <option key={day} value={i}>
+          {day}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 export function AddTodoForm() {
   const [error, setError] = useState<string>();
   const [, startTransition] = useTransition();
+  const daySelect = useRef<HTMLSelectElement>(null);
+
+  // Start on today. Set after mount because the server doesn't know the visitor's timezone.
+  useEffect(() => {
+    if (daySelect.current) daySelect.current.value = String(todayWeekday());
+  }, []);
 
   // Clear the input as soon as the user submits so they can keep typing the
-  // next to-do while this one saves. Put the text back if the save fails.
+  // next to-do while this one saves. The chosen day stays, so adding several
+  // tasks to one day is quick. Put the text back if the save fails.
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
     const input = form.elements.namedItem("title") as HTMLInputElement;
     const title = input.value;
-    form.reset();
+    const weekday = Number(daySelect.current?.value ?? 0);
+    input.value = "";
     startTransition(async () => {
-      const result = await createTodo(title);
+      const result = await createTodo(title, weekday);
       setError(result?.error);
       if (result?.error && !input.value) input.value = title;
     });
@@ -29,6 +52,7 @@ export function AddTodoForm() {
     <form onSubmit={onSubmit} className="flex flex-col gap-2">
       <div className="flex gap-2">
         <input name="title" placeholder="What needs doing?" maxLength={200} required aria-label="New to-do" className={inputClass} />
+        <DaySelect ref={daySelect} name="weekday" aria-label="Day" defaultValue="0" />
         <button className={buttonClass}>Add</button>
       </div>
       <FormMessage error={error} />
@@ -36,9 +60,33 @@ export function AddTodoForm() {
   );
 }
 
+export function WeekList({ todos }: { todos: TodoView[] }) {
+  return (
+    <div className="mt-6 flex flex-col gap-6">
+      {WEEKDAYS.map((day, i) => {
+        const dayTodos = todos.filter((t) => t.weekday === i);
+        if (dayTodos.length === 0) return null;
+        return (
+          <section key={day} aria-labelledby={`day-${i}`}>
+            <h2 id={`day-${i}`} className="mb-1 text-sm font-semibold text-zinc-500 uppercase tracking-wide">
+              {day}
+            </h2>
+            <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              {dayTodos.map((todo) => (
+                <TodoItem key={`${todo.id}:${todo.title}:${todo.weekday}`} todo={todo} />
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 export function TodoItem({ todo }: { todo: TodoView }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(todo.title);
+  const [draftDay, setDraftDay] = useState(todo.weekday);
   const [error, setError] = useState<string>();
   const [pending, startTransition] = useTransition();
   const [done, setOptimisticDone] = useOptimistic(todo.done);
@@ -52,11 +100,17 @@ export function TodoItem({ todo }: { todo: TodoView }) {
 
   function save() {
     startTransition(async () => {
-      const result = await updateTodoTitle(todo.id, draft);
+      const result = await updateTodo(todo.id, draft, draftDay);
       if (result?.error) return setError(result.error);
       setError(undefined);
       setEditing(false);
     });
+  }
+
+  function cancel() {
+    setEditing(false);
+    setDraft(todo.title);
+    setDraftDay(todo.weekday);
   }
 
   return (
@@ -76,6 +130,7 @@ export function TodoItem({ todo }: { todo: TodoView }) {
               e.preventDefault();
               save();
             }}
+            onKeyDown={(e) => e.key === "Escape" && cancel()}
           >
             <input
               autoFocus
@@ -83,9 +138,9 @@ export function TodoItem({ todo }: { todo: TodoView }) {
               maxLength={200}
               aria-label="Edit to-do"
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => e.key === "Escape" && (setEditing(false), setDraft(todo.title))}
               className={inputClass}
             />
+            <DaySelect aria-label="Edit day" value={draftDay} onChange={(e) => setDraftDay(Number(e.target.value))} />
             <button className="text-sm font-medium">Save</button>
           </form>
         ) : (

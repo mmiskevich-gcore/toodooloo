@@ -17,6 +17,12 @@ export const todoTitleSchema = z
   .min(1, "To-do can't be empty.")
   .max(200, "To-do must be at most 200 characters.");
 
+export const weekdaySchema = z.coerce
+  .number()
+  .int()
+  .min(0, "Pick a day of the week.")
+  .max(6, "Pick a day of the week.");
+
 export type FormState = { error?: string; message?: string } | undefined;
 
 export function firstError(error: z.ZodError): string {

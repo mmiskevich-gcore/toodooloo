@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { logout } from "@/app/actions/auth";
-import { AddTodoForm, TodoItem } from "@/components/todo-list";
+import { AddTodoForm, WeekList } from "@/components/todo-list";
 import { getCurrentUser } from "@/lib/dal";
 import { db } from "@/lib/db";
 
@@ -19,8 +19,8 @@ async function Todos() {
   const user = await getCurrentUser();
   const todos = await db.todo.findMany({
     where: { userId: user.id },
-    orderBy: { createdAt: "asc" },
-    select: { id: true, title: true, done: true },
+    orderBy: [{ weekday: "asc" }, { createdAt: "asc" }],
+    select: { id: true, title: true, done: true, weekday: true },
   });
   const left = todos.filter((t) => !t.done).length;
 
@@ -34,14 +34,10 @@ async function Todos() {
       </div>
       <AddTodoForm />
       {todos.length === 0 ? (
-        <p className="mt-8 text-center text-sm text-zinc-500">Nothing to do yet. Add your first to-do above.</p>
+        <p className="mt-8 text-center text-sm text-zinc-500">Nothing planned this week. Add your first to-do above.</p>
       ) : (
         <>
-          <ul className="mt-6 divide-y divide-zinc-200 dark:divide-zinc-800">
-            {todos.map((todo) => (
-              <TodoItem key={`${todo.id}:${todo.title}`} todo={todo} />
-            ))}
-          </ul>
+          <WeekList todos={todos} />
           <p className="mt-4 text-sm text-zinc-500">{left} left</p>
         </>
       )}

@@ -36,20 +36,34 @@ test("register, manage to-dos, reset password", async ({ page }) => {
 
   // Create
   const newTodo = page.getByLabel("New to-do");
+  const day = page.getByLabel("Day", { exact: true });
+  await day.selectOption("Monday");
   await newTodo.fill("Buy milk");
   await newTodo.press("Enter");
+  await day.selectOption("Wednesday");
   await newTodo.fill("Walk the dog");
   await newTodo.press("Enter");
   await expect(page.getByText("2 left")).toBeVisible();
   await expect(newTodo).toHaveValue("");
+  // The chosen day stays after adding, for quick entry of several tasks
+  await expect(day).toHaveValue("2");
+
+  // Tasks are grouped under their day, empty days are hidden
+  const monday = page.getByRole("region", { name: "Monday" });
+  const wednesday = page.getByRole("region", { name: "Wednesday" });
+  await expect(monday.getByText("Buy milk")).toBeVisible();
+  await expect(wednesday.getByText("Walk the dog")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tuesday" })).toHaveCount(0);
 
   // Update: mark done, then rename
   await page.getByLabel('Mark "Buy milk" as done').check();
   await expect(page.getByText("1 left")).toBeVisible();
   await page.getByRole("listitem").filter({ hasText: "Walk the dog" }).getByRole("button", { name: "Edit" }).filter({ visible: true }).click();
   await page.getByLabel("Edit to-do").fill("Walk the cat");
+  await page.getByLabel("Edit day").selectOption("Friday");
   await page.getByRole("button", { name: "Save" }).filter({ visible: true }).click();
-  await expect(page.getByText("Walk the cat")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Friday" }).getByText("Walk the cat")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Wednesday" })).toHaveCount(0);
 
   // Delete
   await page.getByRole("button", { name: 'Delete "Buy milk"' }).click();
@@ -115,6 +129,6 @@ test("users only see their own to-dos", async ({ browser }) => {
   await expect(alice.getByText("Alice's secret")).toBeVisible();
 
   await bob.reload();
-  await expect(bob.getByText("Nothing to do yet")).toBeVisible();
+  await expect(bob.getByText("Nothing planned this week")).toBeVisible();
   await expect(bob.getByText("Alice's secret")).toHaveCount(0);
 });
